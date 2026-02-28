@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Lend — Know Where Your Stuff Is</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,sans-serif;background:#f9fafb;min-height:100vh}
+  button{cursor:pointer;font-family:inherit}
+  input,select{font-family:inherit}
+
+  /* AUTH */
+  #auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#fffbeb,#f9fafb)}
+  .auth-box{background:#fff;border-radius:24px;padding:40px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.1)}
+  .auth-logo{text-align:center;margin-bottom:32px}
+  .auth-logo .icon{font-size:48px}
+  .auth-logo .name{font-size:28px;font-weight:800;color:#111;margin-top:8px}
+  .auth-logo .tagline{font-size:13px;color:#aaa;margin-top:4px}
+  .auth-tabs{display:flex;background:#f3f4f6;border-radius:12px;padding:4px;margin-bottom:28px}
+  .auth-tab{flex:1;padding:8px;border:none;background:transparent;border-radius:10px;font-weight:600;font-size:14px;color:#888;transition:all .15s}
+  .auth-tab.active{background:#fff;color:#111;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .auth-field{margin-bottom:16px}
+  .auth-field label{display:block;font-size:12px;font-weight:700;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+  .auth-field input{width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid #e5e7eb;font-size:14px;outline:none;transition:border .15s}
+  .auth-field input:focus{border-color:#fbbf24}
+  .auth-btn{width:100%;padding:13px;border-radius:12px;border:none;background:#fbbf24;color:#fff;font-weight:700;font-size:15px;margin-top:8px;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+  .auth-btn:hover{background:#f59e0b}
+  .auth-btn:disabled{opacity:.6;cursor:not-allowed}
+  .auth-msg{text-align:center;font-size:13px;margin-top:14px;min-height:20px}
+  .auth-msg.error{color:#dc2626}
+  .auth-msg.success{color:#16a34a}
+
+  /* APP */
+  #app-screen{display:none;min-height:100vh}
+  #app-screen.visible{display:flex;flex-direction:row}
+
+  #user-bar{position:fixed;top:0;right:0;left:220px;height:52px;background:#fff;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:flex-end;padding:0 28px;z-index:100;gap:12px}
+  .user-pill{display:flex;align-items:center;gap:8px;background:#fef3c7;border-radius:20px;padding:6px 14px}
+  .user-pill span{font-size:13px;font-weight:600;color:#b45309}
+  .logout-btn{background:none;border:1px solid #e5e7eb;border-radius:10px;padding:5px 12px;font-size:12px;color:#888;font-weight:600}
+  .logout-btn:hover{background:#f9fafb}
+
+  #sidebar{width:220px;background:#fff;border-right:1px solid #f0f0f0;display:flex;flex-direction:column;min-height:100vh;position:fixed;top:0;left:0;bottom:0}
+  #logo{padding:20px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:10px}
+  #logo .icon{font-size:24px}
+  #logo .name{font-weight:800;font-size:18px;color:#111}
+  #logo .sub{font-size:11px;color:#aaa}
+  nav{flex:1;padding:12px}
+  nav button{width:100%;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:500;margin-bottom:4px;border:none;background:transparent;color:#666;text-align:left;transition:all .15s}
+  nav button.active{background:#fbbf24;color:#fff}
+  #sidebar-footer{padding:12px 16px;border-top:1px solid #f0f0f0;font-size:11px;color:#bbb;text-align:center}
+
+  #main{flex:1;margin-left:220px;margin-top:52px;padding:32px;overflow-y:auto}
+  .container{max-width:860px;margin:0 auto}
+  h1{font-size:24px;font-weight:800;color:#111}
+  .subtitle{color:#aaa;font-size:13px;margin-top:4px;margin-bottom:24px}
+
+  .card{background:#fff;border-radius:16px;border:1px solid #f0f0f0;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+  .stat-card{padding:20px}
+  .stat-icon{font-size:24px;margin-bottom:8px}
+  .stat-val{font-size:30px;font-weight:800;margin-bottom:4px}
+  .stat-label{font-size:12px;color:#aaa}
+
+  .badge{font-size:12px;font-weight:500;padding:4px 10px;border-radius:20px;white-space:nowrap}
+  .badge.green{background:#dcfce7;color:#16a34a}
+  .badge.red{background:#fee2e2;color:#dc2626}
+  .badge.amber{background:#fef3c7;color:#b45309}
+
+  .btn{padding:10px 18px;border-radius:12px;border:none;font-weight:700;font-size:14px;cursor:pointer}
+  .btn.amber{background:#fbbf24;color:#fff}
+  .btn.amber:hover{background:#f59e0b}
+  .btn.outline{background:#fff;border:1px solid #e5e7eb;color:#666}
+  .btn.green-sm{background:#dcfce7;color:#16a34a;padding:6px 12px;font-size:12px;border-radius:8px;border:none;cursor:pointer}
+  .btn.red-sm{background:#fee2e2;color:#dc2626;padding:6px 12px;font-size:12px;border-radius:8px;border:none;cursor:pointer;margin-left:4px}
+
+  table{width:100%;border-collapse:collapse}
+  th{padding:12px 20px;text-align:left;font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;background:#fafafa;border-bottom:1px solid #f0f0f0}
+  td{padding:12px 20px;font-size:14px;border-bottom:1px solid #fafafa}
+  tr.overdue-row{background:#fff5f5}
+
+  .list-row{padding:12px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #fafafa}
+  .list-row .row-left{display:flex;align-items:center;gap:10px}
+  .row-name{font-size:14px;font-weight:500;color:#222}
+  .row-sub{font-size:12px;color:#aaa}
+  .card-header{padding:16px 24px;border-bottom:1px solid #f5f5f5;font-weight:600;color:#333}
+
+  .item-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .item-card{padding:20px}
+  .item-emoji{font-size:36px;margin-bottom:10px}
+  .item-name{font-weight:600;color:#222;margin-bottom:2px}
+  .item-cat{font-size:12px;color:#aaa;margin-bottom:12px}
+  .item-footer{display:flex;align-items:center;justify-content:space-between}
+  .item-avail{font-size:12px;color:#888}
+  .item-del{background:none;border:none;font-size:16px;cursor:pointer;opacity:.3;transition:opacity .15s;padding:4px}
+  .item-del:hover{opacity:1}
+
+  .empty{padding:64px 0;text-align:center;color:#ccc}
+  .empty .e-icon{font-size:48px;margin-bottom:12px}
+  .empty .e-msg{font-size:14px}
+
+  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px}
+  .search-input{width:100%;padding:10px 16px;border-radius:12px;border:1px solid #e5e7eb;font-size:14px;outline:none;margin-bottom:16px}
+
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:9999;align-items:center;justify-content:center}
+  .modal-overlay.open{display:flex}
+  .modal-box{background:#fff;border-radius:20px;padding:28px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+  .modal-box h2{font-size:18px;font-weight:800;margin-bottom:20px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+  .field input,.field select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;font-size:14px;outline:none}
+  .field-row{display:flex;gap:12px;margin-bottom:14px}
+  .field-row .field{flex:1;margin-bottom:0}
+  .modal-btns{display:flex;gap:10px;margin-top:24px}
+  .modal-btns button{flex:1;padding:11px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer}
+  .page{display:none}
+  .page.active{display:block}
+
+  .spinner{width:18px;height:18px;border:3px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .toast{position:fixed;bottom:28px;right:28px;background:#111;color:#fff;padding:12px 20px;border-radius:14px;font-size:14px;font-weight:500;z-index:99999;opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="icon">📤</div>
+      <div class="name">Lend</div>
+      <div class="tagline">Know where your stuff is</div>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">Log In</button>
+      <button class="auth-tab" onclick="switchTab('register')">Register</button>
+    </div>
+    <!-- Login -->
+    <div id="tab-login">
+      <div class="auth-field"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com"/></div>
+      <div class="auth-field"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••"/></div>
+      <button class="auth-btn" id="login-btn" onclick="handleLogin()">Log In</button>
+      <div class="auth-msg" id="login-msg"></div>
+    </div>
+    <!-- Register -->
+    <div id="tab-register" style="display:none">
+      <div class="auth-field"><label>Email</label><input type="email" id="reg-email" placeholder="you@example.com"/></div>
+      <div class="auth-field"><label>Password</label><input type="password" id="reg-pass" placeholder="at least 6 characters"/></div>
+      <div class="auth-field"><label>Confirm Password</label><input type="password" id="reg-pass2" placeholder="repeat password"/></div>
+      <button class="auth-btn" id="reg-btn" onclick="handleRegister()">Create Account</button>
+      <div class="auth-msg" id="reg-msg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP SCREEN -->
+<div id="app-screen">
+  <div id="user-bar">
+    <div class="user-pill"><span id="user-label">👤 </span></div>
+    <button class="logout-btn" onclick="handleLogout()">Log out</button>
+  </div>
+  <div id="sidebar">
+    <div id="logo">
+      <span class="icon">📤</span>
+      <div><div class="name">Lend</div><div class="sub">Know where your stuff is</div></div>
+    </div>
+    <nav>
+      <button class="active" data-page="dashboard">🏠 Dashboard</button>
+      <button data-page="library">📦 Items Library</button>
+      <button data-page="loans">🤝 Active Loans</button>
+      <button data-page="history">📋 History</button>
+    </nav>
+    <div id="sidebar-footer">0 items out on loan</div>
+  </div>
+  <div id="main">
+    <div class="container">
+      <div id="page-dashboard" class="page active">
+        <h1>Dashboard</h1>
+        <p class="subtitle">Here's what's happening with your stuff today.</p>
+        <div class="stat-grid">
+          <div class="card stat-card"><div class="stat-icon">🤝</div><div class="stat-val" style="color:#3b82f6" id="stat-out">0</div><div class="stat-label">Out on Loan</div></div>
+          <div class="card stat-card"><div class="stat-icon">⚠️</div><div class="stat-val" style="color:#ef4444" id="stat-overdue">0</div><div class="stat-label">Overdue</div></div>
+          <div class="card stat-card"><div class="stat-icon">📦</div><div class="stat-val" style="color:#a855f7" id="stat-items">0</div><div class="stat-label">Total Items</div></div>
+          <div class="card stat-card"><div class="stat-icon">✅</div><div class="stat-val" style="color:#22c55e" id="stat-returned">0</div><div class="stat-label">Returned This Week</div></div>
+        </div>
+        <div class="card" style="overflow:hidden">
+          <div class="card-header">Recent Loans</div>
+          <div id="recent-loans"></div>
+        </div>
+      </div>
+
+      <div id="page-library" class="page">
+        <div class="page-header">
+          <div><h1>Items Library</h1><p class="subtitle" style="margin-bottom:0">Everything you track in one place.</p></div>
+          <button class="btn amber" onclick="openModal('addItem')">+ Add Item</button>
+        </div>
+        <div id="item-grid"></div>
+      </div>
+
+      <div id="page-loans" class="page">
+        <div class="page-header">
+          <div><h1>Active Loans</h1><p class="subtitle" style="margin-bottom:0" id="loans-subtitle">0 items out, 0 overdue.</p></div>
+          <button class="btn amber" onclick="openModal('lend')">🤝 Lend Item</button>
+        </div>
+        <div class="card" style="overflow:hidden"><div id="loans-table"></div></div>
+      </div>
+
+      <div id="page-history" class="page">
+        <h1>History</h1>
+        <p class="subtitle">Every loan, ever.</p>
+        <input class="search-input" type="text" placeholder="Search by item or borrower…" oninput="renderHistory(this.value)"/>
+        <div class="card" style="overflow:hidden"><div id="history-list"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Lend -->
+<div class="modal-overlay" id="modal-lend" onclick="closeModalOutside(event,'modal-lend')">
+  <div class="modal-box">
+    <h2>🤝 Lend an Item</h2>
+    <div class="field"><label>Item</label><select id="lend-item"><option value="">Select an item…</option></select></div>
+    <div class="field"><label>Borrower Name</label><input type="text" id="lend-borrower" placeholder="e.g. Alex Kim"/></div>
+    <div class="field"><label>Return Date</label><input type="date" id="lend-due"/></div>
+    <div class="modal-btns">
+      <button class="btn outline" onclick="closeModal('modal-lend')">Cancel</button>
+      <button class="btn amber" id="lend-btn" onclick="handleLend()">Lend It</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Item -->
+<div class="modal-overlay" id="modal-addItem" onclick="closeModalOutside(event,'modal-addItem')">
+  <div class="modal-box">
+    <h2>📦 Add New Item</h2>
+    <div class="field"><label>Item Name</label><input type="text" id="add-name" placeholder="e.g. USB-C Charger"/></div>
+    <div class="field-row">
+      <div class="field"><label>Emoji</label><input type="text" id="add-emoji" placeholder="🔌"/></div>
+      <div class="field"><label>Quantity</label><input type="number" id="add-qty" value="1" min="1"/></div>
+    </div>
+    <div class="field"><label>Category</label>
+      <select id="add-cat"><option>Office</option><option>Electronics</option><option>Tools</option><option>Other</option></select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn outline" onclick="closeModal('modal-addItem')">Cancel</button>
+      <button class="btn amber" id="add-btn" onclick="handleAddItem()">Add Item</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── SUPABASE INIT ────────────────────────────────────
+  const { createClient } = supabase;
+
+  // Cookie-based storage so sessions survive reload on file:// (Edge blocks localStorage)
+  const cookieStorage = {
+    getItem(key) {
+      const name = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; }
+    },
+    setItem(key, value) {
+      document.cookie = encodeURIComponent(key) + '=' + encodeURIComponent(value) +
+        '; path=/; max-age=604800; SameSite=Lax';
+    },
+    removeItem(key) {
+      document.cookie = encodeURIComponent(key) + '=; path=/; max-age=0';
+    }
+  };
+
+  const sb = createClient(
+    'https://iynctezireojrdogkuym.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5bmN0ZXppcmVvanJkb2drdXltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDIzMjksImV4cCI6MjA4Nzg3ODMyOX0.li6S9tn1NW94zOFNWEoWmMp0J_Y-O_ISp5_VvvrbGps',
+    { auth: { storage: cookieStorage, persistSession: true, autoRefreshToken: true } }
+  );
+
+  let currentUser = null;
+  let items = [], loans = [];
+
+  const todayStr = () => new Date().toISOString().split('T')[0];
+  const fmt = d => { if (!d) return '—'; const [y,m,day] = d.split('-'); return `${day}/${m}/${y}`; };
+  const isOverdue = l => !l.returned && l.due < todayStr();
+  const activeLoans = () => loans.filter(l => !l.returned);
+  const loanedCounts = () => {
+    const c = {};
+    activeLoans().forEach(l => c[l.item_id] = (c[l.item_id]||0)+1);
+    return c;
+  };
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (loading) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
+    else { btn.disabled = false; }
+  }
+
+  // ── AUTH ─────────────────────────────────────────────
+  function switchTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+    document.getElementById('tab-login').style.display = tab==='login' ? '' : 'none';
+    document.getElementById('tab-register').style.display = tab==='register' ? '' : 'none';
+  }
+
+  async function handleRegister() {
+    const email = document.getElementById('reg-email').value.trim();
+    const p = document.getElementById('reg-pass').value;
+    const p2 = document.getElementById('reg-pass2').value;
+    const msg = document.getElementById('reg-msg');
+    msg.className = 'auth-msg'; msg.textContent = '';
+    if (!email || !p) { msg.textContent='Please fill in all fields.'; msg.className='auth-msg error'; return; }
+    if (p.length < 6) { msg.textContent='Password must be at least 6 characters.'; msg.className='auth-msg error'; return; }
+    if (p !== p2) { msg.textContent='Passwords do not match.'; msg.className='auth-msg error'; return; }
+    setLoading('reg-btn', true);
+    const { data, error } = await sb.auth.signUp({ email, password: p });
+    setLoading('reg-btn', false);
+    document.getElementById('reg-btn').textContent = 'Create Account';
+    if (error) { msg.textContent = error.message; msg.className='auth-msg error'; return; }
+    msg.textContent = 'Account created! Logging you in…'; msg.className='auth-msg success';
+  }
+
+  async function handleLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const p = document.getElementById('login-pass').value;
+    const msg = document.getElementById('login-msg');
+    msg.className = 'auth-msg'; msg.textContent = '';
+    if (!email || !p) { msg.textContent='Please fill in all fields.'; msg.className='auth-msg error'; return; }
+    setLoading('login-btn', true);
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: p });
+    setLoading('login-btn', false);
+    document.getElementById('login-btn').textContent = 'Log In';
+    if (error) { msg.textContent = error.message; msg.className='auth-msg error'; return; }
+  }
+
+  async function handleLogout() {
+    await sb.auth.signOut();
+  }
+
+  // ── SESSION LISTENER ─────────────────────────────────
+  async function enterApp(user) {
+    currentUser = user;
+    document.getElementById('user-label').textContent = '👤 ' + user.email;
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app-screen').classList.add('visible');
+    await loadData();
+    renderAll();
+  }
+
+  function exitApp() {
+    currentUser = null; items = []; loans = [];
+    document.getElementById('app-screen').classList.remove('visible');
+    document.getElementById('auth-screen').style.display = 'flex';
+  }
+
+  // SIGNED_OUT always works immediately — never block it
+  // INITIAL_SESSION is ignored (unreliable on file://) — we use getSession() instead
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN') {
+      await enterApp(session.user);
+    } else if (event === 'SIGNED_OUT') {
+      exitApp();
+    }
+    // INITIAL_SESSION intentionally ignored — handled by getSession() below
+  });
+
+  // Reliable session restore on page load
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user) {
+      await enterApp(session.user);
+    } else {
+      exitApp();
+    }
+  })();
+
+  // ── DATA LOADING ─────────────────────────────────────
+  async function loadData() {
+    const [itemsRes, loansRes] = await Promise.all([
+      sb.from('items').select('*').order('created_at'),
+      sb.from('loans').select('*').order('created_at', { ascending: false })
+    ]);
+    items = itemsRes.data || [];
+    loans = loansRes.data || [];
+  }
+
+  // ── NAV ──────────────────────────────────────────────
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('page-' + btn.dataset.page).classList.add('active');
+    });
+  });
+
+  // ── RENDER ───────────────────────────────────────────
+  function renderAll() {
+    renderDashboard(); renderLibrary(); renderLoans(); renderHistory();
+    document.getElementById('sidebar-footer').textContent = activeLoans().length + ' items out on loan';
+  }
+
+  function empty(icon, msg) {
+    return `<div class="empty"><div class="e-icon">${icon}</div><div class="e-msg">${msg}</div></div>`;
+  }
+
+  function renderDashboard() {
+    const al = activeLoans(), od = al.filter(isOverdue);
+    const d = new Date(); d.setDate(d.getDate()-7);
+    const weekAgo = d.toISOString().split('T')[0];
+    const retWeek = loans.filter(l => l.returned && l.returned >= weekAgo);
+    document.getElementById('stat-out').textContent = al.length;
+    document.getElementById('stat-overdue').textContent = od.length;
+    document.getElementById('stat-items').textContent = items.length;
+    document.getElementById('stat-returned').textContent = retWeek.length;
+    const el = document.getElementById('recent-loans');
+    if (!al.length) { el.innerHTML = empty('😌','Nothing out on loan right now!'); return; }
+    el.innerHTML = al.slice(0,6).map(l => `
+      <div class="list-row">
+        <div class="row-left"><span style="font-size:20px">${l.emoji}</span>
+          <div><div class="row-name">${l.item_name}</div><div class="row-sub">borrowed by ${l.borrower}</div></div>
+        </div>
+        <span class="badge ${isOverdue(l)?'red':'amber'}">${isOverdue(l)?'Overdue':'Due '+fmt(l.due)}</span>
+      </div>`).join('');
+  }
+
+  function renderLibrary() {
+    const gc = loanedCounts(), el = document.getElementById('item-grid');
+    if (!items.length) { el.innerHTML=`<div class="card">${empty('📦','No items yet — add your first one!')}</div>`; return; }
+    el.innerHTML = `<div class="item-grid">${items.map(item => {
+      const avail = item.total - (gc[item.id]||0);
+      const hasOverdue = activeLoans().some(l => l.item_id===item.id && isOverdue(l));
+      const status = avail>0 ? 'available' : hasOverdue ? 'overdue' : 'on-loan';
+      const bc = status==='available'?'green':status==='overdue'?'red':'amber';
+      const bl = status==='available'?'Available':status==='overdue'?'Overdue':'On Loan';
+      return `<div class="card item-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div class="item-emoji">${item.emoji}</div>
+          <button class="item-del" title="Delete item" onclick="handleDeleteItem(${item.id})">🗑️</button>
+        </div>
+        <div class="item-name">${item.name}</div><div class="item-cat">${item.category}</div>
+        <div class="item-footer"><span class="item-avail">${avail}/${item.total} available</span><span class="badge ${bc}">${bl}</span></div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  function renderLoans() {
+    const al = activeLoans(), od = al.filter(isOverdue);
+    document.getElementById('loans-subtitle').textContent = `${al.length} items out, ${od.length} overdue.`;
+    const el = document.getElementById('loans-table');
+    if (!al.length) { el.innerHTML=empty('🎉',"Nothing out on loan. Everything's home!"); return; }
+    el.innerHTML = `<table><thead><tr><th>Item</th><th>Borrower</th><th>Borrowed</th><th>Due</th><th></th></tr></thead><tbody>
+      ${al.map(l=>`<tr class="${isOverdue(l)?'overdue-row':''}">
+        <td><span style="margin-right:8px">${l.emoji}</span><strong>${l.item_name}</strong></td>
+        <td style="color:#555">${l.borrower}</td>
+        <td style="color:#aaa">${fmt(l.borrowed)}</td>
+        <td style="color:${isOverdue(l)?'#dc2626':'#555'};font-weight:500">${fmt(l.due)}${isOverdue(l)?' ⚠️':''}</td>
+        <td><button class="btn green-sm" onclick="handleReturn(${l.id})">Mark Returned</button></td>
+      </tr>`).join('')}</tbody></table>`;
+  }
+
+  function renderHistory(filter='') {
+    const filtered = [...loans]
+      .filter(l => !filter || l.borrower.toLowerCase().includes(filter.toLowerCase()) || l.item_name.toLowerCase().includes(filter.toLowerCase()));
+    const el = document.getElementById('history-list');
+    if (!filtered.length) { el.innerHTML=empty('📋','No history yet.'); return; }
+    el.innerHTML = filtered.map(l=>`
+      <div class="list-row">
+        <div class="row-left"><span style="font-size:20px">${l.emoji}</span>
+          <div>
+            <div class="row-name">${l.item_name} <span style="color:#aaa;font-weight:400">→ ${l.borrower}</span></div>
+            <div class="row-sub">Borrowed ${fmt(l.borrowed)} · Due ${fmt(l.due)}</div>
+          </div>
+        </div>
+        <span class="badge ${l.returned?'green':isOverdue(l)?'red':'amber'}">${l.returned?'Returned '+fmt(l.returned):isOverdue(l)?'Overdue':'Out'}</span>
+      </div>`).join('');
+  }
+
+  // ── ACTIONS ──────────────────────────────────────────
+  async function handleReturn(id) {
+    const { error } = await sb.from('loans').update({ returned: todayStr() }).eq('id', id);
+    if (error) { showToast('Error: ' + error.message); return; }
+    loans = loans.map(l => l.id===id ? {...l, returned:todayStr()} : l);
+    renderAll(); showToast('✅ Item marked as returned!');
+  }
+
+  async function handleDeleteItem(id) {
+    const activeForItem = activeLoans().filter(l => l.item_id === id);
+    if (activeForItem.length) { showToast('⚠️ Can\'t delete — item is currently out on loan.'); return; }
+    if (!confirm('Delete this item?')) return;
+    const { error } = await sb.from('items').delete().eq('id', id);
+    if (error) { showToast('Error: ' + error.message); return; }
+    items = items.filter(i => i.id !== id);
+    renderAll(); showToast('🗑️ Item deleted.');
+  }
+
+  async function handleLend() {
+    const itemId = parseInt(document.getElementById('lend-item').value);
+    const borrower = document.getElementById('lend-borrower').value.trim();
+    const due = document.getElementById('lend-due').value;
+    if (!itemId||!borrower||!due) { showToast('Please fill in all fields.'); return; }
+    const item = items.find(i=>i.id===itemId);
+    setLoading('lend-btn', true);
+    const { data, error } = await sb.from('loans').insert({
+      user_id: currentUser.id,
+      item_id: item.id,
+      item_name: item.name,
+      emoji: item.emoji,
+      borrower,
+      borrowed: todayStr(),
+      due
+    }).select().single();
+    document.getElementById('lend-btn').textContent = 'Lend It';
+    setLoading('lend-btn', false);
+    if (error) { alert('Lend failed: ' + error.message); return; }
+    loans.unshift(data);
+    closeModal('modal-lend');
+    document.getElementById('lend-item').value='';
+    document.getElementById('lend-borrower').value='';
+    document.getElementById('lend-due').value='';
+    renderAll(); showToast('🤝 Item lent successfully!');
+  }
+
+  async function handleAddItem() {
+    const name = document.getElementById('add-name').value.trim();
+    const emoji = document.getElementById('add-emoji').value.trim();
+    const total = parseInt(document.getElementById('add-qty').value)||1;
+    const category = document.getElementById('add-cat').value;
+    if (!name||!emoji) { showToast('Please enter a name and emoji.'); return; }
+    setLoading('add-btn', true);
+    const { data, error } = await sb.from('items').insert({
+      user_id: currentUser.id, name, emoji, total, category
+    }).select().single();
+    document.getElementById('add-btn').textContent = 'Add Item';
+    setLoading('add-btn', false);
+    if (error) { alert('Save failed: ' + error.message); return; }
+    items.push(data);
+    closeModal('modal-addItem');
+    document.getElementById('add-name').value='';
+    document.getElementById('add-emoji').value='';
+    document.getElementById('add-qty').value=1;
+    renderAll(); showToast('📦 Item added!');
+  }
+
+  // ── MODALS ───────────────────────────────────────────
+  function openModal(id) {
+    if (id==='lend') {
+      const gc = loanedCounts();
+      const sel = document.getElementById('lend-item');
+      sel.innerHTML = '<option value="">Select an item…</option>' +
+        items.filter(i=>(i.total-(gc[i.id]||0))>0).map(i=>`<option value="${i.id}">${i.emoji} ${i.name}</option>`).join('');
+      document.getElementById('lend-due').min = todayStr();
+    }
+    document.getElementById('modal-'+id).classList.add('open');
+  }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  function closeModalOutside(e,id) { if(e.target.id===id) closeModal(id); }
+</script>
+</body>
+</html>
