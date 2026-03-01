@@ -3,57 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lend</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-    <script>
-        // Initialize Supabase
-        const supabaseUrl = 'https://your-supabase-url'; // Replace with your Supabase URL
-        const supabaseKey = process.env.SUPABASE_KEY; // Using environment variable for API key
-        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
-
-        async function fetchData() {
-            try {
-                const { data, error } = await supabase.from('table_name').select('*');
-                if (error) throw new Error('Error fetching data: ' + error.message);
-                // Process data
-            } catch (error) {
-                console.error(error);
-                // Handle error appropriately
-            }
-        }
-
-        // Example of regex escape fix
-        const regex = new RegExp(escapeStringForRegExp(cookieStorageKey));  // Utility function for escaping regex
-
-        function escapeStringForRegExp(string) {
-            return string.replace(/[.*+?^${}()|[\]\/]/g, '\\$&');
-        }
-
-        function validateInput(userInput) {
-            if (typeof userInput !== 'string' || userInput.trim() === '') {
-                throw new Error('Invalid input');
-            }
-            // Further input validation can be added here
-        }
-
-        function handleUserInput(input) {
-            validateInput(input);
-            const safeInput = escapeHtml(input);
-            document.getElementById('output').innerText = safeInput; // Prevent XSS
-        }
-
-        function escapeHtml(unsafe) {
-            return unsafe
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
-    </script>
+    <title>Lend Application</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Lend Application</h1>
-    <div id="output"></div>
+    <header>
+        <h1>Lend Application</h1>
+        <div id="auth-container">
+            <input type="email" id="email" placeholder="Email" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button onclick="login()">Login</button>
+            <button onclick="logout()">Logout</button>
+        </div>
+    </header>
+    <main>
+        <div id="dashboard">
+            <h2>Dashboard</h2>
+            <div id="items-library">
+                <h3>Items Library</h3>
+                <!-- Items will be populated here -->
+            </div>
+            <div id="active-loans">
+                <h3>Active Loans</h3>
+                <!-- Active loans will be tracked here -->
+            </div>
+            <div id="calendar-view">
+                <h3>Calendar View</h3>
+                <!-- Calendar integration goes here -->
+            </div>
+            <div id="statistics">
+                <h3>Statistics</h3>
+                <!-- Statistics will be displayed here -->
+            </div>
+            <div id="categories-management">
+                <h3>Categories Management</h3>
+                <!-- Categories can be managed here -->
+            </div>
+            <div id="history">
+                <h3>Loan History</h3>
+                <!-- Loan history will be listed here -->
+            </div>
+        </div>
+    </main>
+    <script>
+        const supabase = supabase.createClient('YOUR_SUPABASE_URL', 'YOUR_SUPABASE_ANON_KEY');
+
+        async function login() {
+            try {
+                const { user, error } = await supabase.auth.signIn({
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value
+                });
+                if (error) throw error;
+                alert('Logged in successfully!');
+            } catch (error) {
+                console.error('Login Error:', error);
+                alert('Error logging in: ' + error.message);
+            }
+        }
+
+        async function logout() {
+            const { error } = await supabase.auth.signOut();
+            if (error) console.error('Logout Error:', error);
+            else alert('Logged out successfully!');
+        }
+    </script>
 </body>
 </html>
